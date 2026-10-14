@@ -1,3 +1,6 @@
+from decimal import Decimal, DecimalException
+
+from catalog import Author, Category, DigitalBook, Publisher
 from errors import BookStoreError
 from store import BookStore
 
@@ -24,6 +27,9 @@ class ConsoleApp:
         print("9. Оплатить заказ — учебная имитация")
         print("10. Отменить заказ")
         print("11. Показать приобретённые книги")
+        print("12. Добавить книгу в каталог")
+        print("13. Изменить название и цену книги")
+        print("14. Удалить книгу из каталога")
         print("0. Выйти")
 
     @staticmethod
@@ -35,6 +41,12 @@ class ConsoleApp:
                 "Идентификатор должен быть положительным."
             )
         return value
+
+    @staticmethod
+    def read_price() -> Decimal:
+        """Прочитать цену с точкой или запятой."""
+        text = input("Цена в рублях: ").strip().replace(",", ".")
+        return Decimal(text)
 
     def show_catalog(self) -> None:
         """Показать книги каталога."""
@@ -177,7 +189,7 @@ class ConsoleApp:
         print("Заказ отменён.")
 
     def show_purchased_books(self) -> None:
-        """Показать приобретённые книги и записанные пути к файлам."""
+        """Показать приобретённые книги и пути к файлам."""
         licenses = self.store.get_licenses(self.customer_id)
         if not licenses:
             print("Приобретённых книг пока нет.")
@@ -188,6 +200,131 @@ class ConsoleApp:
                 f"{license_record.item.book_title} — "
                 f"{license_record.get_file_path()}"
             )
+
+    def add_catalog_book(self) -> None:
+        """Создать книгу и добавить её в каталог."""
+        book_id = self.read_id("Идентификатор новой книги: ")
+        books = self.store.catalog.list_books()
+
+        if any(book.id == book_id for book in books):
+            raise BookStoreError(
+                f"Книга с идентификатором {book_id} уже существует."
+            )
+
+        title = input("Название книги: ")
+        author_name = input("Имя автора: ").strip()
+        publisher_name = input("Название издательства: ").strip()
+        category_name = input("Название категории: ").strip()
+        price = self.read_price()
+        file_format = input("Формат (PDF, EPUB, FB2): ")
+        file_path = input("Путь к файлу книги: ")
+
+        author = next(
+            (
+                book.author
+                for book in books
+                if book.author.name.casefold() == author_name.casefold()
+            ),
+            None,
+        )
+        if author is None:
+            author_id = max(
+                (book.author.id for book in books),
+                default=0,
+            ) + 1
+            author = Author(author_id, author_name)
+
+        publisher = next(
+            (
+                book.publisher
+                for book in books
+                if book.publisher.name.casefold()
+                == publisher_name.casefold()
+            ),
+            None,
+        )
+        if publisher is None:
+            publisher_id = max(
+                (book.publisher.id for book in books),
+                default=0,
+            ) + 1
+            publisher = Publisher(publisher_id, publisher_name)
+
+        category = next(
+            (
+                book.category
+                for book in books
+                if book.category.name.casefold()
+                == category_name.casefold()
+            ),
+            None,
+        )
+        if category is None:
+            category_id = max(
+                (book.category.id for book in books),
+                default=0,
+            ) + 1
+            category = Category(category_id, category_name)
+
+        book = DigitalBook(
+            book_id=book_id,
+            title=title,
+            author=author,
+            publisher=publisher,
+            category=category,
+            price=price,
+            file_format=file_format,
+            file_path=file_path,
+        )
+
+        self.store.catalog.add_book(book)
+        print(f"Книга «{book.title}» добавлена в каталог.")
+
+    def update_catalog_book(self) -> None:
+        """Изменить название и цену книги."""
+        book_id = self.read_id("Идентификатор книги: ")
+        book = self.store.catalog.get_book(book_id)
+
+        print(f"Текущее название: {book.title}")
+        print(f"Текущая цена: {book.price:.2f} руб.")
+
+        title = input("Новое название: ")
+        price = self.read_price()
+
+        self.store.catalog.update_book(book_id, title, price)
+        print("Данные книги изменены.")
+
+    def remove_catalog_book(self) -> None:
+        """Удалить книгу, не используемую покупателем."""
+        book_id = self.read_id("Идентификатор книги: ")
+        book = self.store.catalog.get_book(book_id)
+        cart = self.store.get_cart(self.customer_id)
+
+        if any(item.book.id == book_id for item in cart.get_items()):
+            raise BookStoreError(
+                "Сначала удалите книгу из корзины."
+            )
+
+        for order in self.store.list_orders(self.customer_id):
+            if any(
+                item.book.id == book_id
+                for item in order.get_items()
+            ):
+                raise BookStoreError(
+                    "Книга используется в истории заказов "
+                    "и не может быть удалена."
+                )
+
+        answer = input(
+            f"Удалить книгу «{book.title}»? Введите «да»: "
+        ).strip().casefold()
+
+        if answer != "да":
+            print("Удаление отменено.")
+            return
+
+        self.store.catalog.remove_book(book_id)
+        print("Книга удалена из каталога.")
 
     def run(self) -> None:
         """Обрабатывать команды до выхода пользователя."""
@@ -203,6 +340,9 @@ class ConsoleApp:
             "9": self.pay_order,
             "10": self.cancel_order,
             "11": self.show_purchased_books,
+            "12": self.add_catalog_book,
+            "13": self.update_catalog_book,
+            "14": self.remove_catalog_book,
         }
 
         print(
@@ -228,6 +368,8 @@ class ConsoleApp:
 
             except BookStoreError as error:
                 print(f"Операция не выполнена: {error}")
+            except DecimalException:
+                print("Ошибка ввода: некорректное значение цены.")
             except ValueError as error:
                 print(f"Ошибка ввода: {error}")
             except (EOFError, KeyboardInterrupt):
