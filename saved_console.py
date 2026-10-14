@@ -1,13 +1,15 @@
 from decimal import DecimalException
+from typing import Callable
 
 from console_app import ConsoleApp
 from errors import BookStoreError
 from store import BookStore
 from store_storage import JsonStoreStorage
+from xml_storage import XmlStoreStorage
 
 
 class SavedConsoleApp(ConsoleApp):
-    """Меню магазина с сохранением и загрузкой JSON."""
+    """Меню магазина с сохранением JSON и обменом данными XML."""
 
     def __init__(
         self,
@@ -17,35 +19,69 @@ class SavedConsoleApp(ConsoleApp):
     ) -> None:
         super().__init__(store, customer_id)
         self.storage = storage
+        self.xml_storage = XmlStoreStorage(
+            storage.file_path.with_suffix(".xml")
+        )
+
+    def get_actions(
+        self,
+    ) -> dict[str, tuple[str, Callable[[], None]]]:
+        """Связать номера меню, подписи и действия."""
+        return {
+            "1": ("Показать каталог", self.show_catalog),
+            "2": ("Найти книгу", self.find_books),
+            "3": ("Добавить книгу в корзину", self.add_to_cart),
+            "4": ("Показать корзину", self.show_cart),
+            "5": ("Удалить книгу из корзины", self.remove_from_cart),
+            "6": ("Очистить корзину", self.clear_cart),
+            "7": ("Оформить заказ", self.create_order),
+            "8": ("Показать мои заказы", self.show_orders),
+            "9": (
+                "Оплатить заказ — учебная имитация",
+                self.pay_order,
+            ),
+            "10": ("Отменить заказ", self.cancel_order),
+            "11": (
+                "Показать приобретённые книги",
+                self.show_purchased_books,
+            ),
+            "12": (
+                "Добавить книгу в каталог",
+                self.add_catalog_book,
+            ),
+            "13": (
+                "Изменить название и цену книги",
+                self.update_catalog_book,
+            ),
+            "14": (
+                "Удалить книгу из каталога",
+                self.remove_catalog_book,
+            ),
+            "15": ("Сохранить данные в JSON", self.save_data),
+            "16": ("Загрузить сохранение JSON", self.load_data),
+            "17": ("Экспортировать магазин в XML", self.export_xml),
+            "18": ("Загрузить магазин из XML", self.import_xml),
+        }
 
     def show_menu(self) -> None:
-        """Вывести команды магазина и работы с сохранением."""
+        """Вывести доступные действия."""
         print("\nМагазин цифровых книг")
-        print("1. Показать каталог")
-        print("2. Найти книгу")
-        print("3. Добавить книгу в корзину")
-        print("4. Показать корзину")
-        print("5. Удалить книгу из корзины")
-        print("6. Очистить корзину")
-        print("7. Оформить заказ")
-        print("8. Показать мои заказы")
-        print("9. Оплатить заказ — учебная имитация")
-        print("10. Отменить заказ")
-        print("11. Показать приобретённые книги")
-        print("12. Добавить книгу в каталог")
-        print("13. Изменить название и цену книги")
-        print("14. Удалить книгу из каталога")
-        print("15. Сохранить данные")
-        print("16. Загрузить последнее сохранение")
-        print("0. Сохранить данные и выйти")
+
+        for number, (description, _) in self.get_actions().items():
+            print(f"{number}. {description}")
+
+        print("0. Сохранить данные в JSON и выйти")
 
     def save_data(self) -> None:
-        """Сохранить текущее состояние магазина."""
+        """Сохранить текущее состояние в JSON."""
         self.storage.save(self.store)
-        print("Данные магазина сохранены.")
+        print("Данные магазина сохранены в JSON.")
 
-    def load_data(self) -> None:
-        """Заменить состояние после успешной проверки сохранения."""
+    def load_from(
+        self,
+        storage: JsonStoreStorage | XmlStoreStorage,
+    ) -> None:
+        """Заменить состояние только после успешной загрузки."""
         answer = input(
             "Несохранённые изменения будут заменены. "
             "Для загрузки введите «да»: "
@@ -55,37 +91,33 @@ class SavedConsoleApp(ConsoleApp):
             print("Загрузка отменена.")
             return
 
-        restored_store = self.storage.load()
+        restored_store = storage.load()
         restored_store.get_customer(self.customer_id)
 
         self.store = restored_store
         print("Сохранённые данные магазина загружены.")
 
-    def run(self) -> None:
-        """Обрабатывать команды и сохранять данные при выходе."""
-        actions = {
-            "1": self.show_catalog,
-            "2": self.find_books,
-            "3": self.add_to_cart,
-            "4": self.show_cart,
-            "5": self.remove_from_cart,
-            "6": self.clear_cart,
-            "7": self.create_order,
-            "8": self.show_orders,
-            "9": self.pay_order,
-            "10": self.cancel_order,
-            "11": self.show_purchased_books,
-            "12": self.add_catalog_book,
-            "13": self.update_catalog_book,
-            "14": self.remove_catalog_book,
-            "15": self.save_data,
-            "16": self.load_data,
-        }
+    def load_data(self) -> None:
+        """Загрузить последнее сохранение JSON."""
+        self.load_from(self.storage)
 
+    def export_xml(self) -> None:
+        """Сохранить текущее состояние в XML."""
+        self.xml_storage.save(self.store)
+        print("Магазин экспортирован в XML.")
+
+    def import_xml(self) -> None:
+        """Загрузить состояние из XML."""
+        self.load_from(self.xml_storage)
+
+    def run(self) -> None:
+        """Обрабатывать команды и сохранять JSON при выходе."""
         print(
-            "При выходе через пункт 0 данные сохраняются автоматически."
+            "При выходе через пункт 0 данные сохраняются в JSON."
         )
-        print("Для сохранения во время работы выберите пункт 15.")
+        print(
+            "Для обмена данными в XML используйте пункты 17 и 18."
+        )
 
         while True:
             try:
@@ -97,11 +129,12 @@ class SavedConsoleApp(ConsoleApp):
                     print("Работа завершена.")
                     return
 
-                action = actions.get(choice)
-                if action is None:
+                action_entry = self.get_actions().get(choice)
+                if action_entry is None:
                     print("Неизвестная команда. Выберите пункт меню.")
                     continue
 
+                _, action = action_entry
                 action()
 
             except BookStoreError as error:
