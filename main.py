@@ -4,8 +4,22 @@ from cart import Cart
 from catalog import Author, Category, DigitalBook, Publisher
 from customers import Customer
 from errors import BookStoreError
-from orders import Order
-from purchases import Payment, PurchaseLicense
+
+
+def show_cart(cart: Cart) -> None:
+    """Вывести содержимое и стоимость корзины."""
+    items = cart.get_items()
+
+    if not items:
+        print("Корзина пуста.")
+    else:
+        for item in items:
+            print(
+                f"{item.book.title} — "
+                f"{item.get_price():.2f} руб."
+            )
+
+    print(f"Итого: {cart.get_total():.2f} руб.")
 
 
 def main() -> None:
@@ -37,64 +51,45 @@ def main() -> None:
     )
 
     cart = Cart(customer)
+    print(f"Покупатель: {cart.customer.name}")
+
+    print("\nНачальное состояние:")
+    show_cart(cart)
+
     cart.add_book(first_book)
     cart.add_book(second_book)
-
-    order = Order(1, cart)
-    items = order.get_items()
-
-    print(f"Заказ № {order.id}")
-    print(f"Сумма: {order.get_total():.2f} руб.")
-    print(f"Начальный статус: {order.status}")
+    print("\nПосле добавления двух книг:")
+    show_cart(cart)
 
     try:
-        PurchaseLicense(1, order, items[0])
+        cart.add_book(first_book)
     except BookStoreError as error:
         print(f"\nОшибка обработана: {error}")
 
-    payment = Payment(1, order)
+    first_book.update("Капитанская дочка", Decimal("149.90"))
+    print("\nПосле изменения цены первой книги:")
+    show_cart(cart)
 
-    result = payment.process(success=False)
-    print(f"\nПервая попытка оплаты: {result}")
-    print(f"Статус платежа: {payment.status}")
-    print(f"Статус заказа: {order.status}")
+    cart.remove_book(second_book.id)
+    print("\nПосле удаления второй книги:")
+    show_cart(cart)
 
-    result = payment.process(success=True)
-    print(f"\nВторая попытка оплаты: {result}")
-    print(f"Статус платежа: {payment.status}")
-    print(f"Статус заказа: {order.status}")
-
-    licenses: list[PurchaseLicense] = []
-
-    for license_id, item in enumerate(items, start=1):
-        license_record = PurchaseLicense(license_id, order, item)
-        licenses.append(license_record)
-        customer.add_purchased_book(item.book)
+    try:
+        cart.remove_book(second_book.id)
+    except BookStoreError as error:
+        print(f"\nОшибка обработана: {error}")
 
     cart.clear()
+    print("\nПосле очистки:")
+    show_cart(cart)
 
-    print("\nВыданные права доступа:")
-    for license_record in licenses:
-        print(
-            f"{license_record.item.book_title} — "
-            f"{license_record.get_file_path()}"
-        )
-
-    print(
-        f"\nКниг у покупателя: "
-        f"{len(customer.get_purchased_books())}"
-    )
-    print(f"Позиций в корзине: {len(cart.get_items())}")
+    # Имитация ранее приобретённой книги для проверки ограничения.
+    customer.add_purchased_book(second_book)
 
     try:
-        payment.process()
+        cart.add_book(second_book)
     except BookStoreError as error:
         print(f"\nОшибка обработана: {error}")
-
-    try:
-        order.cancel()
-    except BookStoreError as error:
-        print(f"Ошибка обработана: {error}")
 
 
 if __name__ == "__main__":
