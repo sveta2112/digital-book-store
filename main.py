@@ -1,9 +1,12 @@
 from decimal import Decimal
+from pathlib import Path
 
 from catalog import Author, Category, DigitalBook, Publisher
-from console_app import ConsoleApp
 from customers import Customer
+from errors import BookStoreError
+from saved_console import SavedConsoleApp
 from store import BookStore
+from store_storage import JsonStoreStorage
 
 
 def create_demo_store() -> BookStore:
@@ -47,8 +50,35 @@ def create_demo_store() -> BookStore:
 
 
 def main() -> None:
-    store = create_demo_store()
-    app = ConsoleApp(store, customer_id=1)
+    file_path = (
+        Path(__file__).resolve().parent
+        / "data"
+        / "shop_state.json"
+    )
+    storage = JsonStoreStorage(file_path)
+
+    try:
+        if file_path.exists():
+            store = storage.load()
+            store.get_customer(1)
+            print("Загружено сохранённое состояние магазина.")
+        else:
+            store = create_demo_store()
+            print("Создан начальный каталог магазина.")
+
+    except BookStoreError as error:
+        print(f"Не удалось открыть магазин: {error}")
+        print(
+            "Проверьте файл data/shop_state.json. "
+            "Существующее сохранение не изменено."
+        )
+        raise SystemExit(1) from error
+
+    app = SavedConsoleApp(
+        store=store,
+        customer_id=1,
+        storage=storage,
+    )
     app.run()
 
 
