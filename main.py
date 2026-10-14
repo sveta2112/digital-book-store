@@ -4,22 +4,22 @@ from cart import Cart
 from catalog import Author, Category, DigitalBook, Publisher
 from customers import Customer
 from errors import BookStoreError
+from orders import Order
 
 
-def show_cart(cart: Cart) -> None:
-    """Вывести содержимое и стоимость корзины."""
-    items = cart.get_items()
+def show_order(order: Order) -> None:
+    """Вывести сведения о заказе."""
+    print(f"Заказ № {order.id}")
+    print(f"Покупатель: {order.customer.name}")
+    print(f"Статус: {order.status}")
 
-    if not items:
-        print("Корзина пуста.")
-    else:
-        for item in items:
-            print(
-                f"{item.book.title} — "
-                f"{item.get_price():.2f} руб."
-            )
+    for item in order.get_items():
+        print(
+            f"{item.book_title} — "
+            f"{item.purchase_price:.2f} руб."
+        )
 
-    print(f"Итого: {cart.get_total():.2f} руб.")
+    print(f"Сумма заказа: {order.get_total():.2f} руб.")
 
 
 def main() -> None:
@@ -51,43 +51,33 @@ def main() -> None:
     )
 
     cart = Cart(customer)
-    print(f"Покупатель: {cart.customer.name}")
-
-    print("\nНачальное состояние:")
-    show_cart(cart)
-
     cart.add_book(first_book)
     cart.add_book(second_book)
-    print("\nПосле добавления двух книг:")
-    show_cart(cart)
 
-    try:
-        cart.add_book(first_book)
-    except BookStoreError as error:
-        print(f"\nОшибка обработана: {error}")
+    order = Order(1, cart)
+
+    print("Созданный заказ:")
+    show_order(order)
 
     first_book.update("Капитанская дочка", Decimal("149.90"))
-    print("\nПосле изменения цены первой книги:")
-    show_cart(cart)
 
-    cart.remove_book(second_book.id)
-    print("\nПосле удаления второй книги:")
-    show_cart(cart)
+    print("\nПосле изменения цены в каталоге:")
+    print(f"Цена первой книги: {first_book.price:.2f} руб.")
+    print(f"Сумма корзины: {cart.get_total():.2f} руб.")
+    print(f"Сумма заказа: {order.get_total():.2f} руб.")
+
+    order.cancel()
+    print(f"\nСтатус после отмены: {order.status}")
 
     try:
-        cart.remove_book(second_book.id)
+        order.cancel()
     except BookStoreError as error:
-        print(f"\nОшибка обработана: {error}")
+        print(f"Ошибка обработана: {error}")
 
-    cart.clear()
-    print("\nПосле очистки:")
-    show_cart(cart)
-
-    # Имитация ранее приобретённой книги для проверки ограничения.
-    customer.add_purchased_book(second_book)
+    empty_cart = Cart(customer)
 
     try:
-        cart.add_book(second_book)
+        Order(2, empty_cart)
     except BookStoreError as error:
         print(f"\nОшибка обработана: {error}")
 
