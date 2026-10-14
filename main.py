@@ -1,30 +1,37 @@
 from decimal import Decimal
 
 from catalog import Author, Category, DigitalBook, Publisher
-from catalog_service import BookCatalog
+from customers import Customer
 from errors import BookStoreError
 
 
-def show_catalog(catalog: BookCatalog) -> None:
-    """Вывести книги из каталога."""
-    books = catalog.list_books()
-    if not books:
-        print("Каталог пуст.")
-        return
-
-    for book in books:
-        print(
-            f"{book.id}. {book.title} — "
-            f"{book.author.name}, {book.price:.2f} руб."
-        )
-
-
 def main() -> None:
+    customer = Customer(
+        user_id=1,
+        name="Анна",
+        email="anna@example.com",
+    )
+
+    print(f"Покупатель: {customer.name}")
+    print(f"Почта: {customer.email}")
+    print(f"Приобретённых книг: {len(customer.get_purchased_books())}")
+
+    customer.update_profile("Анна Иванова", "anna@example.com")
+    print(f"После изменения имя: {customer.name}")
+
+    try:
+        customer.update_profile("Другое имя", "неверный адрес")
+    except ValueError as error:
+        print(f"Ошибка обработана: {error}")
+
+    print(f"После ошибки имя сохранено: {customer.name}")
+    print(f"После ошибки почта сохранена: {customer.email}")
+
     author = Author(1, "Александр Пушкин")
     publisher = Publisher(1, "Учебное издательство")
     category = Category(1, "Классика")
 
-    first_book = DigitalBook(
+    book = DigitalBook(
         book_id=1,
         title="Капитанская дочка",
         author=author,
@@ -35,49 +42,20 @@ def main() -> None:
         file_path="books/captains_daughter.epub",
     )
 
-    second_book = DigitalBook(
-        book_id=2,
-        title="Евгений Онегин",
-        author=author,
-        publisher=publisher,
-        category=category,
-        price=Decimal("249.00"),
-        file_format="PDF",
-        file_path="books/eugene_onegin.pdf",
-    )
+    print(f"Книга уже приобретена: {customer.has_book(book.id)}")
 
-    catalog = BookCatalog()
-    catalog.add_book(first_book)
-    catalog.add_book(second_book)
+    # Проверка учёта книг без оформления заказа и оплаты.
+    customer.add_purchased_book(book)
 
-    print("Каталог после добавления:")
-    show_catalog(catalog)
-
-    print("\nПоиск по слову «КАПИТАН»:")
-    for book in catalog.find_books("КАПИТАН"):
-        print(book.title)
-
-    catalog.update_book(
-        book_id=1,
-        title="Капитанская дочка",
-        price=Decimal("149.90"),
-    )
-    print("\nКаталог после изменения цены:")
-    show_catalog(catalog)
+    print(f"После записи в коллекцию: {customer.has_book(book.id)}")
+    print("Книги покупателя:")
+    for purchased_book in customer.get_purchased_books():
+        print(purchased_book.title)
 
     try:
-        catalog.add_book(first_book)
+        customer.add_purchased_book(book)
     except BookStoreError as error:
-        print(f"\nОшибка обработана: {error}")
-
-    catalog.remove_book(2)
-    print("\nКаталог после удаления второй книги:")
-    show_catalog(catalog)
-
-    try:
-        catalog.get_book(2)
-    except BookStoreError as error:
-        print(f"\nОшибка обработана: {error}")
+        print(f"Ошибка обработана: {error}")
 
 
 if __name__ == "__main__":
