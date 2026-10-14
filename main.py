@@ -1,41 +1,40 @@
-from catalog import Author, Category, Publisher
+from decimal import Decimal
+
+from catalog import Author, Category, DigitalBook, Publisher
 
 
 def main() -> None:
     author = Author(1, "Александр Пушкин")
-    print(f"Создан автор: {author.name}")
-
     publisher = Publisher(1, "Учебное издательство")
-    category = Category(1, "Художественная литература")
+    category = Category(1, "Классика")
 
-    print(f"Издательство: {publisher.name}")
-    print(f"Категория: {category.name}")
-
-    publisher.update("Электронная библиотека")
-    category.update("Классика")
-
-    print(f"Новое издательство: {publisher.name}")
-    print(f"Новая категория: {category.name}")
-
-    try:
-        category.update("   ")
-    except ValueError as error:
-        print(f"Ошибка обработана: {error}")
-
-    print(f"После ошибки категория сохранена: {category.name}")
-
-    author.update(
-        "Александр Сергеевич Пушкин",
-        "Русский поэт и писатель.",
+    book = DigitalBook(
+        book_id=1,
+        title="Капитанская дочка",
+        author=author,
+        publisher=publisher,
+        category=category,
+        price=Decimal("199.90"),
+        file_format="epub",
+        file_path="books/captains_daughter.epub",
     )
-    print(f"После изменения: {author.name}")
+
+    print(f"Книга: {book.title}")
+    print(f"Автор: {book.author.name}")
+    print(f"Издательство: {book.publisher.name}")
+    print(f"Категория: {book.category.name}")
+    print(f"Формат: {book.file_format}")
+    print(f"Цена: {book.price:.2f} руб.")
+
+    book.update("Капитанская дочка", Decimal("149.90"))
+    print(f"После изменения цена: {book.price:.2f} руб.")
 
     try:
-        author.update("   ", "")
+        book.update("Капитанская дочка", Decimal("-10.00"))
     except ValueError as error:
         print(f"Ошибка обработана: {error}")
 
-    print(f"После ошибки имя сохранено: {author.name}")
+    print(f"После ошибки цена сохранена: {book.price:.2f} руб.")
 
 
 if __name__ == "__main__":
